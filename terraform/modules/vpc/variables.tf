@@ -5,7 +5,7 @@ variable "author" {
 
 variable "business_unit" {
   type        = string
-  default     = "dps"
+  default     = "digitify"
   description = "Business Unit"
 }
 
