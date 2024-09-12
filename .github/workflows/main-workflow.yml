@@ -1,0 +1,77 @@
+name: Main workflow
+on:
+  workflow_dispatch:
+  push:
+    branches: [main, dev]
+jobs:
+
+  changes:
+    name: changes
+    uses: ./.github/workflows/changes.yaml
+    secrets: inherit
+
+  # digitifyApp
+  digitifyApp-build:
+    name: digitifyApp
+    needs: changes
+    if: ${{ needs.changes.outputs.digitifyApp == 'true' }}
+    uses: ./.github/workflows/reusable.yaml
+    secrets: inherit
+    with:
+      name: digitifyApp
+      work_dir: .
+      image_name: digitify-sprint-boot
+      helm_dir: digitify-app
+      values_identifier: image
+
+  squash-merge:
+    runs-on: ubuntu-latest
+    needs:
+      [
+        ambassador-build,
+      ]
+    if: ${{ always() }}
+    steps:
+      - name: Checkout to branch
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.CI_GIT_TOKEN }}
+      - name: Squash CI commits
+        run: |
+          git config user.name "github-actions"
+          git config user.email "github-actions@github.com"
+          if [ `git branch -a --list origin/ci-${{ github.ref_name }}-version-bump-${GITHUB_SHA::8}` ]
+          then
+            git pull -ff origin ${{ github.ref_name }}
+            git merge --squash origin/ci-${{ github.ref_name }}-version-bump-${GITHUB_SHA::8}* 
+            git add .
+            git commit -m "[skip ci] version bumped"
+            git push origin ${{ github.ref_name }}
+            git push origin -d ci-${{ github.ref_name }}-version-bump-${GITHUB_SHA::8}
+          else
+            printf "No build job ran. Nothing to merge"
+          fi
+
+  slack-workflow-status:
+    if: always()
+    name: Post Workflow Status To Slack
+    needs: squash-merge
+    runs-on: ubuntu-latest
+    # actions.read permission is required.
+    permissions:
+      actions: "read"
+    steps:
+      - name: Slack Workflow Notification
+        uses: Gamesight/slack-workflow-status@v1.1.0
+        with:
+          # Required Input
+          repo_token: ${{secrets.GITHUB_TOKEN}}
+          slack_webhook_url: ${{secrets.SLACK_WEBHOOK_URL}}
+          include_jobs: "false"
+          # Optional Input
+          channel: ${{secrets.SLACK_CHANNEL_NAME}}
+          name: "GitHub Action CI Bot"
+          icon_emoji: ":squirrel:"
+          icon_url: "https://avatars0.githubusercontent.com/u/1701160?s=96&v=4"
+#The EOF

@@ -1,0 +1,52 @@
+name: "ENV PROVISIONER"
+
+on: 
+  workflow_dispatch:
+
+jobs:
+  Infra-Provisioning:
+    runs-on: infra-provisioner
+
+    steps:
+      - name: Git checkout
+        uses: actions/checkout@v3
+
+      - name: VPC Provisioning
+        run: |
+          cd terraform/envs/${{ github.ref_name }}/vpc;
+          terraform init -backend-config="bucket=digitify-terraform-state-remote-backend" -backend-config="key=${{ github.ref_name }}/vpc/terraform.tfstate" -backend-config="region=us-east-1" -backend-config="dynamodb_table=digitify-terraform-state-lock";
+          terraform apply -var-file=../../${{ github.ref_name }}.tfvar -auto-approve;
+
+      - name: Bastion Provisioning
+        run: |
+          cd terraform/envs/${{ github.ref_name }}/bastion;
+          terraform init -backend-config="bucket=digitify-terraform-state-remote-backend" -backend-config="key=${{ github.ref_name }}/bastion/terraform.tfstate" -backend-config="region=us-east-1" -backend-config="dynamodb_table=digitify-terraform-state-lock";
+          terraform apply -var-file=../../${{ github.ref_name }}.tfvar -auto-approve;
+
+      - name: Bastion Server Key
+        if: always()
+        uses: actions/upload-artifact@v2
+        with:
+          name: digitify-${{ github.ref_name }}-Bastion-Server-Key
+          path: terraform/envs/${{ github.ref_name }}/bastion/digitify-${{ github.ref_name }}-bastion-key.pem
+
+
+      - name: EKS Provisioning
+        run: |
+          cd terraform/envs/${{ github.ref_name }}/eks;
+          terraform init -backend-config="bucket=digitify-terraform-state-remote-backend" -backend-config="key=${{ github.ref_name }}/eks/terraform.tfstate" -backend-config="region=us-east-1" -backend-config="dynamodb_table=digitify-terraform-state-lock";
+          terraform apply -var-file=../../${{ github.ref_name }}.tfvar -auto-approve;
+
+      - name: EKS Worker Nodes Key
+        if: always()
+        uses: actions/upload-artifact@v2
+        with:
+          name: digitify-${{ github.ref_name }}-EKS-Worker-Nodes-Key
+          path: terraform/envs/${{ github.ref_name }}/eks/digitify-${{ github.ref_name }}-eks-worker-node-key.pem
+
+      - name: Argocd Provisioning
+        run: |
+          cd terraform/envs/${{ github.ref_name }}/argocd;
+          terraform init -backend-config="bucket=digitify-terraform-state-remote-backend" -backend-config="key=${{ github.ref_name }}/argocd/terraform.tfstate" -backend-config="region=us-east-1" -backend-config="dynamodb_table=digitify-terraform-state-lock";
+          terraform apply -var-file=../../${{ github.ref_name }}.tfvar -auto-approve;
+          sleep 300;

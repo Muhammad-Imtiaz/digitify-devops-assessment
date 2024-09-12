@@ -1,0 +1,21 @@
+name: Detect changes
+on:
+  workflow_call:
+    outputs:
+      digitifyApp:
+        value: ${{ jobs.changes.outputs.digitifyApp }}
+jobs:
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      digitifyApp: ${{ steps.filter.outputs.digitifyApp }}
+    steps:
+    - name: Checkout to branch
+      uses: actions/checkout@v3
+    - uses: dorny/paths-filter@v2
+      id: filter
+      with:
+        base: ${{ github.ref_name }}
+        filters: |
+          digitifyApp:
+            - './**/*'
