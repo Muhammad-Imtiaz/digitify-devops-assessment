@@ -26,10 +26,6 @@ jobs:
 
   squash-merge:
     runs-on: ubuntu-latest
-    needs:
-      [
-        ambassador-build,
-      ]
     if: ${{ always() }}
     steps:
       - name: Checkout to branch
