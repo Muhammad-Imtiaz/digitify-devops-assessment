@@ -17,7 +17,7 @@ data "kubectl_file_documents" "cluster-rbac" {
 
 
 data "kubectl_file_documents" "digitify-applicationset" {
-  content = file("./manifests/applicationset-${var.environment}.yaml")
+  content = file("./manifests/applicationset-dev.yaml")
 }
 
 ## Deploying the manifests
