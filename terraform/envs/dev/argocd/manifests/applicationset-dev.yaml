@@ -1,0 +1,34 @@
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: digitify-appset
+  namespace: argocd
+spec:
+  generators:
+    - git:
+        repoURL: https://github.com/Muhammad-Imtiaz/digitify-devops-assessment.git
+        revision: main
+        directories:
+          - path: helmcharts/digitify-app
+  template:
+    metadata:
+      name: "{{path.basename}}"
+    spec:
+      project: default
+      syncPolicy:
+        syncOptions:
+          - CreateNamespace=true
+          - ApplyOutOfSyncOnly=true
+        automated:
+          prune: true
+          selfHeal: true
+      source:
+        repoURL: https://github.com/Muhammad-Imtiaz/digitify-devops-assessment.git
+        targetRevision: main
+        path: "{{path}}"
+        helm:
+          valueFiles:
+            - values.yaml
+      destination:
+        server: https://kubernetes.default.svc
+        namespace: default

@@ -1,0 +1,41 @@
+name: "ENV DESTROYER"
+
+on: 
+  workflow_dispatch:
+
+jobs:
+  Infra-Destroying:
+    runs-on: infra-provisioner
+
+    steps:
+      - name: Git checkout
+        uses: actions/checkout@v3
+      - run: pwd;ls;
+
+      - name: Destroying Argocd
+        continue-on-error: true
+        run: |
+          cd terraform/envs/${{ github.ref_name }}/argocd;
+          terraform init -backend-config="bucket=digitify-terraform-state-remote-backend" -backend-config="key=${{ github.ref_name }}/argocd/terraform.tfstate" -backend-config="region=us-east-1" -backend-config="dynamodb_table=digitify-terraform-state-lock";
+          terraform destroy -var-file=../../${{ github.ref_name }}.tfvar -auto-approve;
+
+      - name: Destroying EKS
+        continue-on-error: true
+        run: |
+          cd terraform/envs/${{ github.ref_name }}/eks;
+          terraform init -backend-config="bucket=digitify-terraform-state-remote-backend" -backend-config="key=${{ github.ref_name }}/eks/terraform.tfstate" -backend-config="region=us-east-1" -backend-config="dynamodb_table=digitify-terraform-state-lock";
+          terraform destroy -var-file=../../${{ github.ref_name }}.tfvar -auto-approve;
+
+      - name: Destroying Bastion
+        continue-on-error: true
+        run: |
+          cd terraform/envs/${{ github.ref_name }}/bastion;
+          terraform init -backend-config="bucket=digitify-terraform-state-remote-backend" -backend-config="key=${{ github.ref_name }}/bastion/terraform.tfstate" -backend-config="region=us-east-1" -backend-config="dynamodb_table=digitify-terraform-state-lock";
+          terraform destroy -var-file=../../${{ github.ref_name }}.tfvar -auto-approve;
+
+      - name: Destroying VPC
+        continue-on-error: true
+        run: |
+          cd terraform/envs/${{ github.ref_name }}/vpc;
+          terraform init -backend-config="bucket=digitify-terraform-state-remote-backend" -backend-config="key=${{ github.ref_name }}/vpc/terraform.tfstate" -backend-config="region=us-east-1" -backend-config="dynamodb_table=digitify-terraform-state-lock";
+          terraform destroy -var-file=../../${{ github.ref_name }}.tfvar -auto-approve;

@@ -1,0 +1,95 @@
+name: reusable
+on:
+  workflow_call:
+    inputs:
+      name:
+        required: true
+        type: string
+        description: name of the service
+      work_dir:
+        required: true
+        type: string
+        description: Directory where source code for service is located.
+      image_name:
+        required: true
+        type: string
+        description: The image name you want assign to service container build.
+      helm_dir:
+        required: false
+        type: string
+        description: Directory path where the service helm chart resides.
+      values_identifier:
+        required: false
+        type: string
+        description: The value in helm under which image tag that needs to updated resides.
+
+# The required job for reusable workflow
+jobs:
+  reusable-build:
+    name: ${{ inputs.name }}
+    runs-on: ubuntu-latest
+    steps:
+
+      # INSTALLING YQ
+      - name: Install yq
+        run: |
+          sudo snap install yq
+
+      # CHECKING OUT
+      - name: Checkout to branch
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.CI_GIT_TOKEN }}
+    
+      # SELECTING REGISTRY
+      - name: Login to Dockerhub
+        uses: docker/login-action@v2
+        with:
+          registry: index.docker.io/v1
+          username: ${{ secrets.dockerhub_username }}
+          password: ${{ secrets.dockerhub_password }}
+
+      # SELECTING REGISTRY
+      - name: Selecting Registry
+        env:
+          DOCKERHUB_REGISTRY: imtiaz1519
+        run: |
+          REPO=$DOCKERHUB_REGISTRY
+          echo "REPO=$REPO" >> $GITHUB_ENV
+
+      # IMAGE BUILDING
+      - name: Docker Build image
+        working-directory: ${{ inputs.work_dir }}
+        run: |
+          docker build -t ${{ env.REPO }}/${{ inputs.image_name }}:latest .
+
+      # IMAGE PUSH
+      - name: push image to REPO
+        run: |
+            docker push ${{ env.REPO }}/${{ inputs.image_name }}:latest
+
+      # UPDATE HELM CHART VALUES FILE
+      - name: Update values.yaml
+        uses: mikefarah/yq@master
+        if: ${{ inputs.helm }}
+        with:
+          cmd: |
+            yq e -i '.${{ inputs.values_identifier}}.tag = "latest"' 'helmcharts/${{ inputs.helm_dir }}/values.yaml'
+
+      # PUSH THE CHANGES INTO REPO
+      - name: Create branch, commit & push
+        uses: nick-fields/retry@v2
+        with:
+          max_attempts: 8
+          retry_wait_seconds: 3
+          timeout_minutes: 2
+          command: |
+            git config user.name "github-actions"
+            git config user.email "github-actions@github.com"
+            git pull --ff origin ci-${{ github.ref_name }}-version-bump-${GITHUB_SHA::8}
+            git status
+            git add helmcharts/${{ inputs.helm_dir }}/values.yaml
+            git status
+            git commit -m "[skip ci] ${{ inputs.name }} image tag updated in values.yaml"
+            git push origin ci-${{ github.ref_name }}-version-bump-${GITHUB_SHA::8}
